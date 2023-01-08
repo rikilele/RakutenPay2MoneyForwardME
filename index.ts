@@ -55,21 +55,26 @@ export class MailWatcher {
    * If there are new emails, notifies subscribers.
    */
   private async ping() {
-    const emails = await this.mailslurp.getEmails(this.inboxId);
-    emails
-      .filter((email) => !email.read)
-      .forEach(async (email) => {
-        const { id } = email;
-        const { body } = await this.mailslurp.getEmail(id);
-        if (!!body) {
-          const payContent = this.parseEmailBody(body);
-          if (this.isValidPayContent(payContent)) {
-            this.subscribers.forEach((subscriber) => {
-              subscriber(payContent);
-            });
+    try {
+      const emails = await this.mailslurp.getEmails(this.inboxId);
+      emails
+        .filter((email) => !email.read)
+        .forEach(async (email) => {
+          const { id } = email;
+          const { body } = await this.mailslurp.getEmail(id);
+          if (!!body) {
+            const payContent = this.parseEmailBody(body);
+            if (this.isValidPayContent(payContent)) {
+              this.subscribers.forEach((subscriber) => {
+                subscriber(payContent);
+              });
+            }
           }
-        }
-      });
+        });
+    } catch (e) {
+      console.log("Ping failed");
+      console.error(e);
+    }
   }
 
   private parseEmailBody(body: string): PayContent {
@@ -122,7 +127,7 @@ export class MailWatcher {
  * Import the transaction into Money Forward ME.
  */
 async function importToMoneyForwardME(
-  id: string,
+  email: string,
   pw: string,
   payContent: PayContent
 ) {
@@ -132,7 +137,7 @@ async function importToMoneyForwardME(
     content,
   } = payContent;
 
-  const browser = await puppeteer.launch();
+  const browser = await puppeteer.launch({ headless: false });
   const page = await browser.newPage();
 
   /**
@@ -141,7 +146,7 @@ async function importToMoneyForwardME(
 
   await page.goto("https://id.moneyforward.com/sign_in/email");
 
-  await page.type(".inputItem", id);
+  await page.type(".inputItem", email);
   await Promise.all([
     page.click(".submitBtn"),
     page.waitForNavigation(),
@@ -176,8 +181,6 @@ async function importToMoneyForwardME(
 
   await page.click("#js-cf-manual-payment-entry-submit-button");
   await browser.close();
-
-  console.log(payContent);
 }
 
 /**********
@@ -200,9 +203,17 @@ if (
   && MONEY_FORWARD_PW
 ) {
   const watcher = new MailWatcher(MAILSLURP_API_KEY, MAILSLURP_INBOX_ID);
-  watcher.subscribe("import to Money Forward ME", (payContent) => {
-    importToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payContent);
+  watcher.subscribe("import to Money Forward ME", async (payContent) => {
+    console.log("---");
+    console.log(payContent);
+    try {
+      await importToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payContent);
+      console.log("success");
+    } catch (e) {
+      console.log("import to Money Forward ME failed");
+      console.error(e);
+    }
   });
 
-  console.log("Started watching...");
+  console.log("Started watching...\n");
 }
