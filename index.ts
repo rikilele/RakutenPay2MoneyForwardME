@@ -1,16 +1,15 @@
+// Copyright (c) 2023 Riki Singh Khorana. All rights reserved. MIT License.
+
 import * as dotenv from "dotenv";
 import { MailSlurp } from "mailslurp-client";
 import { parse } from "node-html-parser";
 import puppeteer from "puppeteer";
 
 /**
- * 楽天ペイアプリご利用内容確認メール
- *
- * ↓ transferable content ↓
- *
- * マネーフォワード ME カンタン入力
+ * A transaction information that can translate from
+ * 楽天ペイアプリご利用内容確認メール to マネーフォワード ME カンタン入力
  */
-export interface PayContent {
+export interface Transaction {
   date: string;
   amount: string;
   content: string;
@@ -19,7 +18,7 @@ export interface PayContent {
 /**
  * A function that reacts to new transactions.
  */
-export type Subscriber = (payContent: PayContent) => void;
+export type Subscriber = (transaction: Transaction) => void;
 
 /**
  * A class that watches incoming transaction emails.
@@ -29,13 +28,21 @@ export class MailWatcher {
   private inboxId: string;
   private subscribers: Map<string, Subscriber>;
 
+  /**
+   * @param apiKey API Key for MailSlurp
+   * @param inboxId The Inbox ID of the inbox that receives Rakuten Pay emails.
+   */
   constructor(apiKey: string, inboxId: string) {
     this.mailslurp = new MailSlurp({ apiKey });
     this.inboxId = inboxId;
     this.subscribers = new Map();
     this.ping = this.ping.bind(this);
+
+    // First ping
     this.ping();
-    setInterval(this.ping, 5 * 60 * 1000) // every 5 minutes
+
+    // Every 5 minutes hereafter
+    setInterval(this.ping, 5 * 60 * 1000);
   }
 
   subscribe(id: string, fn: Subscriber) {
@@ -55,19 +62,17 @@ export class MailWatcher {
    * If there are new emails, notifies subscribers.
    */
   private async ping() {
+    this.printPingTime();
     try {
-      const emails = await this.mailslurp.getEmails(this.inboxId);
-      emails
+      (await this.mailslurp.getEmails(this.inboxId))
         .filter((email) => !email.read)
         .forEach(async (email) => {
           const { id } = email;
           const { body } = await this.mailslurp.getEmail(id);
           if (!!body) {
-            const payContent = this.parseEmailBody(body);
-            if (this.isValidPayContent(payContent)) {
-              this.subscribers.forEach((subscriber) => {
-                subscriber(payContent);
-              });
+            const transaction = this.parseEmailBody(body);
+            if (this.isValidTransaction(transaction)) {
+              this.subscribers.forEach((subscriber) => subscriber(transaction));
             }
           }
         });
@@ -77,8 +82,13 @@ export class MailWatcher {
     }
   }
 
-  private parseEmailBody(body: string): PayContent {
-    const payContent: PayContent = {
+  private printPingTime() {
+    const now = new Date();
+    console.log(`Ping ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`);
+  }
+
+  private parseEmailBody(body: string): Transaction {
+    const transaction: Transaction = {
       date: "",
       amount: "",
       content: "",
@@ -89,19 +99,19 @@ export class MailWatcher {
       switch (td.textContent.trim()) {
         case "ご利用日時": {
           const date = td.nextElementSibling.textContent.trim().slice(0, 10);
-          payContent.date = date;
+          transaction.date = date;
           break;
         }
 
-        case "決済総額": {
-          const amount = td.nextElementSibling.textContent.trim().slice(1);
-          payContent.amount = amount;
+        case "ポイント/キャッシュ利用": {
+          const amount = td.nextElementSibling.textContent.trim().slice(2);
+          transaction.amount = amount;
           break;
         }
 
         case "ご利用店舗": {
           const content = td.nextElementSibling.textContent.trim();
-          payContent.content = `${content} 楽天ペイ`;
+          transaction.content = `${content} 楽天ポイント/キャッシュ利用`;
           break;
         }
 
@@ -111,14 +121,14 @@ export class MailWatcher {
       }
     });
 
-    return payContent;
+    return transaction;
   }
 
-  private isValidPayContent(payContent: PayContent): boolean {
+  private isValidTransaction(transaction: Transaction): boolean {
     return (
-      payContent.date !== ""
-      && payContent.amount !== ""
-      && payContent.content !== ""
+      transaction.date !== ""
+      && transaction.amount !== ""
+      && transaction.content !== ""
     );
   }
 }
@@ -129,13 +139,13 @@ export class MailWatcher {
 async function importToMoneyForwardME(
   email: string,
   pw: string,
-  payContent: PayContent
+  transaction: Transaction
 ) {
   const {
     date,
     amount,
     content,
-  } = payContent;
+  } = transaction;
 
   const browser = await puppeteer.launch({ headless: false });
   const page = await browser.newPage();
@@ -168,16 +178,29 @@ async function importToMoneyForwardME(
    * Input content.
    */
 
+  // 金額
   await page.type("#js-cf-manual-payment-entry-amount", amount);
-  await page.type("#js-cf-manual-payment-entry-content", content);
-  // @ts-ignore - el.value always exists
-  await page.$eval("#js-cf-manual-payment-entry-updated-at", (el, val) => el.value = val, date);
 
-  // @ts-ignore - el.value always exists
-  await page.$eval("#user_asset_act_large_category_id", (el) => el.value = "0");
-  // @ts-ignore - el.value always exists
-  await page.$eval("#user_asset_act_middle_category_id", (el) => el.value = "0");
-  await page.select("#user_asset_act_sub_account_id_hash", "0"); // select なし
+  // 内容
+  await page.type("#js-cf-manual-payment-entry-content", content);
+
+  // 日付
+  await page.$eval("#js-cf-manual-payment-entry-updated-at", (el, val) => {
+    (el as HTMLInputElement).value = val;
+  }, date);
+
+  // 大項目：未分類 ("0")
+  await page.$eval("#user_asset_act_large_category_id", (el) => {
+    (el as HTMLInputElement).value = "0";
+  });
+
+  // 中項目：未分類 ("0")
+  await page.$eval("#user_asset_act_middle_category_id", (el) => {
+    (el as HTMLInputElement).value = "0";
+  });
+
+  // 支出元：なし ("0")
+  await page.select("#user_asset_act_sub_account_id_hash", "0");
 
   await page.click("#js-cf-manual-payment-entry-submit-button");
   await browser.close();
@@ -189,6 +212,7 @@ async function importToMoneyForwardME(
 
 dotenv.config();
 
+// Load environment variables
 const {
   MAILSLURP_API_KEY,
   MAILSLURP_INBOX_ID,
@@ -203,17 +227,17 @@ if (
   && MONEY_FORWARD_PW
 ) {
   const watcher = new MailWatcher(MAILSLURP_API_KEY, MAILSLURP_INBOX_ID);
-  watcher.subscribe("import to Money Forward ME", async (payContent) => {
+  watcher.subscribe("Import to Money Forward ME", async (transaction) => {
     console.log("---");
-    console.log(payContent);
+    console.log(transaction);
     try {
-      await importToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payContent);
-      console.log("success");
+      await importToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, transaction);
+      console.log("Import to Money Forward ME succeeded");
     } catch (e) {
-      console.log("import to Money Forward ME failed");
+      console.log("Import to Money Forward ME failed\n");
       console.error(e);
     }
-  });
 
-  console.log("Started watching...\n");
+    console.log("---");
+  });
 }
