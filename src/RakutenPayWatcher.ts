@@ -88,8 +88,7 @@ export class RakutenPayWatcher {
         }
 
         case "ご利用店舗": {
-          const merchant = td.nextElementSibling.textContent.trim();
-          result.merchant = `${merchant} 楽天ポイント/キャッシュ利用`;
+          result.merchant = td.nextElementSibling.textContent.trim();
           break;
         }
 
