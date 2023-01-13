@@ -9,13 +9,13 @@ import { parse } from "node-html-parser";
  */
 export class RakutenPayWatcher {
 
-  // MailSlurp API Controller
+  /** MailSlurp API Controller */
   private mailslurp: MailSlurp;
 
-  // The MailSlurp Inbox ID that receives Rakuten Pay emails
+  /** The MailSlurp Inbox ID that receives Rakuten Pay emails */
   private inboxId: string;
 
-  // List of subscribers to Rakuten Pay transactions
+  /** List of subscribers to Rakuten Pay transactions */
   private subscribers: RakutenPaySubscriber[];
 
   /**
