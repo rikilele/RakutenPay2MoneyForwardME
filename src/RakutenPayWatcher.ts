@@ -56,6 +56,9 @@ export class RakutenPayWatcher {
             const transaction = this.parseEmailBody(body);
             if (this.isValidTransaction(transaction)) {
               this.subscribers.forEach((subscriber) => subscriber(transaction));
+            } else {
+              console.log("Invalid transaction detected");
+              console.log(transaction);
             }
           }
         });
@@ -76,7 +79,8 @@ export class RakutenPayWatcher {
       merchant: "",
       totalAmount: 0,
       pointsUsed: 0,
-      amountPaid: 0,
+      cashUsed: 0,
+      cardUsed: 0,
     };
 
     const htmlRoot = parse(body);
@@ -98,15 +102,21 @@ export class RakutenPayWatcher {
           break;
         }
 
-        case "ポイント/キャッシュ利用": {
-          const pointsUsed = td.nextElementSibling.textContent.trim().slice(2);
+        case "ポイント": {
+          const pointsUsed = td.nextElementSibling.textContent.trim();
           result.pointsUsed = parseInt(pointsUsed.replaceAll(",", ""), 10);
           break;
         }
 
-        case "お支払金額": {
+        case "楽天キャッシュ": {
           const amountPaid = td.nextElementSibling.textContent.trim().slice(1);
-          result.amountPaid = parseInt(amountPaid.replaceAll(",", ""), 10);
+          result.cashUsed = parseInt(amountPaid.replaceAll(",", ""), 10);
+          break;
+        }
+
+        case "カード": {
+          const amountPaid = td.nextElementSibling.textContent.trim().slice(1);
+          result.cardUsed = parseInt(amountPaid.replaceAll(",", ""), 10);
           break;
         }
 
@@ -123,14 +133,15 @@ export class RakutenPayWatcher {
       merchant,
       totalAmount,
       pointsUsed,
-      amountPaid,
+      cashUsed,
+      cardUsed,
     } = transaction;
 
     return (
       date !== ""
       && merchant !== ""
       && totalAmount !== 0
-      && totalAmount === (pointsUsed + amountPaid)
+      && totalAmount === (pointsUsed + cashUsed + cardUsed)
     );
   }
 }
@@ -149,11 +160,14 @@ export interface RakutenPayTransaction {
   /** 決済総額 */
   totalAmount: number;
 
-  /** ポイント/キャッシュ利用 */
+  /** ポイント */
   pointsUsed: number;
 
-  /** お支払金額 */
-  amountPaid: number;
+  /** 楽天キャッシュ */
+  cashUsed: number;
+
+  /** カード */
+  cardUsed: number;
 };
 
 /**

@@ -51,28 +51,42 @@ watcher.subscribe((transaction) => {
     date,
     merchant,
     pointsUsed,
+    cashUsed,
   } = transaction;
 
   // TODO: Dynamically edit category
 
-  const payment = {
+  const pointPayment = {
     largeCategory: "0",
     middleCategory: "0",
     date,
     amount: pointsUsed,
     source: "0",
-    content: `${merchant} 楽天ポイント/キャッシュ利用`,
+    content: `${merchant} 楽天ポイント利用`,
   };
 
-  exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
-    .then(() => {
-      console.log("\nExport to Money Forward ME succeeded");
-    })
-    .catch((e) => {
-      console.log("\nExport to Money Forward ME failed\n");
-      console.error(e);
-    })
-    .finally(() => {
-      console.log("\n-----");
-    });
+  const cashPayment = {
+    largeCategory: "0",
+    middleCategory: "0",
+    date,
+    amount: cashUsed,
+    source: "0",
+    content: `${merchant} 楽天キャッシュ利用`,
+  };
+
+  [pointPayment, cashPayment].forEach((payment) => {
+    if (payment.amount > 0) {
+      exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
+        .then(() => {
+          console.log("\nExport to Money Forward ME succeeded");
+        })
+        .catch((e) => {
+          console.log("\nExport to Money Forward ME failed\n");
+          console.error(e);
+        })
+        .finally(() => {
+          console.log("\n-----");
+        });
+    }
+  });
 });
