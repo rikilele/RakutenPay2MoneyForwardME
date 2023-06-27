@@ -32,21 +32,21 @@ export async function exportToMoneyForwardME(
 
   await page.goto("https://id.moneyforward.com/sign_in/email");
 
-  await page.type(".inputItem", email);
+  await page.type("input[type=email]", email);
   await Promise.all([
-    page.click(".submitBtn"),
+    page.click("input[type=submit]"),
     page.waitForNavigation(),
   ]);
 
-  await page.type(".inputItem", pw);
+  await page.type("input[type=password]", pw);
   await Promise.all([
-    page.click(".submitBtn"),
+    page.click("input[type=submit]"),
     page.waitForNavigation(),
   ]);
 
   await page.goto("https://moneyforward.com/sign_in");
   await Promise.all([
-    page.click(".submitBtn"),
+    page.click("input[type=submit]"),
     page.waitForNavigation(),
   ]);
 
