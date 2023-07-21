@@ -44,8 +44,6 @@ if (!MONEY_FORWARD_PW) {
 
 const watcher = new RakutenPayWatcher(MAILSLURP_API_KEY, MAILSLURP_INBOX_ID);
 watcher.subscribe((transaction) => {
-  console.log("-----\n");
-  console.log(transaction);
 
   const {
     date,
@@ -78,13 +76,16 @@ watcher.subscribe((transaction) => {
     if (payment.amount > 0) {
       exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
         .then(() => {
+          console.log("-----\n");
+          console.log(transaction);
           console.log("\nExport to Money Forward ME succeeded");
+          console.log("\n-----");
         })
         .catch((e) => {
+          console.log("-----\n");
+          console.log(transaction);
           console.log("\nExport to Money Forward ME failed\n");
           console.error(e);
-        })
-        .finally(() => {
           console.log("\n-----");
         });
     }
