@@ -74,6 +74,7 @@ watcher.subscribe((transaction) => {
 
   [pointPayment, cashPayment].forEach((payment) => {
     if (payment.amount > 0) {
+      console.log(`\n----- Trying ${payment.content}`);
       exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
         .then(() => {
           console.log("-----\n");

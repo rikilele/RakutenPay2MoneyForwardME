@@ -56,7 +56,7 @@ export async function exportToMoneyForwardME(
     ]);
 
     await Promise.all([
-      page.click('a[data-ga-mfid="passkey_rejected"]'),
+      page.click('a[ping="/passkey_promotion/collect?event=passkey_rejected"]'),
       page.waitForNavigation(),
     ]);
 
