@@ -69,8 +69,10 @@ export class RakutenPayWatcher {
   }
 
   private printPingTime() {
+    process.stdout.write("\x1b[2K");
+    process.stdout.write("\x1b[0E");
     const now = new Date();
-    console.log(`Ping ${now.toDateString()} ${now.toTimeString()}`);
+    process.stdout.write(`Ping ${now.toDateString()} ${now.toTimeString()}`);
   }
 
   private parseEmailBody(body: string): RakutenPayTransaction {
