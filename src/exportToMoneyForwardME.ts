@@ -32,7 +32,7 @@ export async function exportToMoneyForwardME(
      * Sign in *
      ***********/
 
-    await page.goto("https://id.moneyforward.com/sign_in/email");
+    await page.goto("https://id.moneyforward.com/sign_in");
 
     await page.type("input[type=email]", email);
     await Promise.all([
@@ -55,8 +55,10 @@ export async function exportToMoneyForwardME(
       page.waitForNavigation(),
     ]);
 
+    const [a] = await page.$x("//a[contains(., 'No thanks')]");
     await Promise.all([
-      page.click('a[ping="/passkey_promotion/collect?event=passkey_rejected"]'),
+      //@ts-ignore
+      a.click(),
       page.waitForNavigation(),
     ]);
 
