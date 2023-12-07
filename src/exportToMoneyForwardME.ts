@@ -49,11 +49,19 @@ export async function exportToMoneyForwardME(
     ]);
 
     await page.goto("https://moneyforward.com/sign_in");
-    await Promise.all([
-      // page.click("input[type=submit]"),
-      page.click("#submitto"),
-      page.waitForNavigation(),
-    ]);
+    const buttons = await page.$$('button');
+    for (const button of buttons) {
+      const buttonText = await page.evaluate(el => el.innerText, button);
+      if (buttonText.includes(email)) {
+        await Promise.all([
+          //@ts-ignore
+          button.click(),
+          page.waitForNavigation(),
+        ]);
+
+        break;
+      }
+    }
 
     const [a] = await page.$x("//a[contains(., 'No thanks')]");
     await Promise.all([
