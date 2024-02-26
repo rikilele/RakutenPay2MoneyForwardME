@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Riki Singh Khorana. All rights reserved. MIT License.
+// Copyright (c) 2023-2024 Riki Singh Khorana. All rights reserved. MIT License.
 
 import { MailSlurp } from "mailslurp-client";
 import { parse } from "node-html-parser";
@@ -45,38 +45,34 @@ export class RakutenPayWatcher {
    * Extracts the transaction information and notifies subscribers on new mail.
    */
   private async ping() {
-    this.printPingTime();
     try {
       (await this.mailslurp.getEmails(this.inboxId))
         .filter((email) => !email.read)
         .forEach(async (email) => {
           const { id } = email;
-          const { body } = await this.mailslurp.getEmail(id);
-          if (body) {
-            const transaction = this.parseEmailBody(body);
-            if (this.isValidTransaction(transaction)) {
-              this.subscribers.forEach((subscriber) => subscriber(transaction));
-            } else {
-              console.log("Invalid transaction detected");
-              console.log(transaction);
+
+          try {
+            const { body } = await this.mailslurp.getEmail(id);
+            if (body) {
+              const transaction = this.parseEmailBody(id, body);
+              if (this.isValidTransaction(transaction)) {
+                this.subscribers.forEach((subscriber) => subscriber(transaction));
+              } else {
+                console.log(`❌ メール内容を正しく読み取れませんでした。 emailId: ${id}`);
+              }
             }
+          } catch (e) {
+            console.log(`❌ メール取得に失敗しました。 emailId: ${id}`);
           }
         });
     } catch (e) {
-      console.log("\nPing failed\n");
-      console.error(e);
+      console.log(`❌ メールサーバーとの通信に失敗しました。`);
     }
   }
 
-  private printPingTime() {
-    process.stdout.write("\x1b[2K");
-    process.stdout.write("\x1b[0E");
-    const now = new Date();
-    process.stdout.write(`Ping ${now.toDateString()} ${now.toTimeString()}`);
-  }
-
-  private parseEmailBody(body: string): RakutenPayTransaction {
+  private parseEmailBody(id: string, body: string): RakutenPayTransaction {
     const result: RakutenPayTransaction = {
+      emailId: id,
       date: "",
       merchant: "",
       totalAmount: 0,
@@ -152,6 +148,7 @@ export class RakutenPayWatcher {
  * 「楽天ペイアプリご利用内容確認メール」から読み取れる取引内容。
  */
 export interface RakutenPayTransaction {
+  emailId: string;
 
   /** ご利用日時： YYYY/MM/DD */
   date: string;

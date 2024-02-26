@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Riki Singh Khorana. All rights reserved. MIT License.
+// Copyright (c) 2023-2024 Riki Singh Khorana. All rights reserved. MIT License.
 
 import * as dotenv from "dotenv";
 import { RakutenPayWatcher } from "./RakutenPayWatcher";
@@ -42,10 +42,12 @@ if (!MONEY_FORWARD_PW) {
  * 取引内容を抽出し、マネーフォワード ME に書き出す。
  */
 
+process.stdout.write('\x1Bc');
 const watcher = new RakutenPayWatcher(MAILSLURP_API_KEY, MAILSLURP_INBOX_ID);
 watcher.subscribe((transaction) => {
 
   const {
+    emailId,
     date,
     merchant,
     pointsUsed,
@@ -74,20 +76,13 @@ watcher.subscribe((transaction) => {
 
   [pointPayment, cashPayment].forEach((payment) => {
     if (payment.amount > 0) {
-      console.log(`\n----- Trying ${payment.content}`);
       exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
         .then(() => {
-          console.log("-----\n");
-          console.log(transaction);
-          console.log("\nExport to Money Forward ME succeeded");
-          console.log("\n-----");
+          console.log(`✅ ${date} ${merchant} ${payment.amount}`);
         })
         .catch((e) => {
-          console.log("-----\n");
-          console.log(transaction);
-          console.log("\nExport to Money Forward ME failed\n");
+          console.log(`❌ マネーフォワードへの書き出しに失敗しました。 emailId: ${emailId}`);
           console.error(e);
-          console.log("\n-----");
         });
     }
   });

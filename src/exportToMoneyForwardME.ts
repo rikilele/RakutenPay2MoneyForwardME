@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Riki Singh Khorana. All rights reserved. MIT License.
+// Copyright (c) 2023-2024 Riki Singh Khorana. All rights reserved. MIT License.
 
 import puppeteer from "puppeteer";
 
