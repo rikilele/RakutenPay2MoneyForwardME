@@ -58,15 +58,15 @@ export class RakutenPayWatcher {
               if (this.isValidTransaction(transaction)) {
                 this.subscribers.forEach((subscriber) => subscriber(transaction));
               } else {
-                console.log(`❌ メール内容を正しく読み取れませんでした。 emailId: ${id}`);
+                console.log(` ❌ メール内容を正しく読み取れませんでした。 emailId: ${id}`);
               }
             }
           } catch (e) {
-            console.log(`❌ メール取得に失敗しました。 emailId: ${id}`);
+            console.log(` ❌ メール取得に失敗しました。 emailId: ${id}`);
           }
         });
     } catch (e) {
-      console.log(`❌ メールサーバーとの通信に失敗しました。`);
+      console.log(` ❌ メールサーバーとの通信に失敗しました。`);
     }
   }
 
