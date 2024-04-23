@@ -86,22 +86,18 @@ watcher.subscribe((transaction) => {
         .then(() => {
           console.log(` ✅ ${date} ${merchant} ${payment.amount}`);
         })
-        .catch((e) => {
-          console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 emailId: ${emailId}\n`);
-          console.error(e);
-          console.log();
-
+        .catch(() => {
           setTimeout(() => {
             exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
               .then(() => {
                 console.log(` ✅ ${date} ${merchant} ${payment.amount}`);
               })
               .catch((e) => {
-                console.log(`\n ❗️ マネーフォワードへの２回目の書き出しに失敗しました。 emailId: ${emailId}\n`);
+                console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 emailId: ${emailId}\n`);
                 console.error(e);
                 console.log();
               });
-            });
+          }, 3 * 60 * 1000);
         });
     }
   });
