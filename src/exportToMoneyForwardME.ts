@@ -63,13 +63,6 @@ export async function exportToMoneyForwardME(
       }
     }
 
-    const [a] = await page.$x("//a[contains(., 'No thanks')]");
-    await Promise.all([
-      //@ts-ignore
-      a.click(),
-      page.waitForNavigation(),
-    ]);
-
     /*****************
      * Input payment *
      *****************/
