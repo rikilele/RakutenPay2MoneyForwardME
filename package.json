@@ -5,9 +5,9 @@
   "main": "src/index.ts",
   "dependencies": {
     "dotenv": "^16.0.3",
-    "mailslurp-client": "^15.14.1",
+    "mailslurp-client": "^15.20.2",
     "node-html-parser": "^6.1.4",
-    "puppeteer": "^19.4.1"
+    "puppeteer": "^23.6.0"
   },
   "devDependencies": {
     "@types/node": "^18.11.18",
