@@ -4,7 +4,8 @@ import { MailSlurp } from "mailslurp-client";
 import { parse } from "node-html-parser";
 
 /**
- * MailSlurp に送られてくる「楽天ペイアプリご利用内容確認メール」から取引内容を抽出し、
+ * MailSlurp に送られてくる「楽天ペイアプリご利用内容確認メール」と
+ * 「楽天ペイ 注文受付（自動配信メール）」から取引内容を抽出し、
  * それらに対してアクションを起こす関数を管理・通知を飛ばすクラス。
  */
 export class RakutenPayWatcher {
@@ -19,7 +20,8 @@ export class RakutenPayWatcher {
   private subscribers: RakutenPaySubscriber[];
 
   /**
-   * MailSlurp に送られてくる「楽天ペイアプリご利用内容確認メール」から取引内容を抽出し、
+   * MailSlurp に送られてくる「楽天ペイアプリご利用内容確認メール」と
+   * 「楽天ペイ 注文受付（自動配信メール）」から取引内容を抽出し、
    * それらに対してアクションを起こす関数を管理・通知を飛ばすオブジェクトを生成。
    *
    * @param apiKey MailSlurp の API キー
@@ -55,7 +57,10 @@ export class RakutenPayWatcher {
             const { body } = await this.mailslurp.getEmail(id);
             if (body) {
               const transaction = this.parseEmailBody(id, body);
-              if (this.isValidTransaction(transaction)) {
+              if (
+                this.isValidTransaction(transaction)
+                && (transaction.pointsUsed > 0 || transaction.cashUsed > 0)
+              ) {
                 this.subscribers.forEach((subscriber) => subscriber(transaction));
               } else {
                 console.log(` ❌ メール内容を正しく読み取れませんでした。 emailId: ${id}`);
@@ -84,6 +89,11 @@ export class RakutenPayWatcher {
     const htmlRoot = parse(body);
     htmlRoot.getElementsByTagName("td").forEach((td) => {
       switch (td.textContent.trim()) {
+
+        /**
+         * 楽天ペイアプリご利用内容確認メール
+         */
+
         case "ご利用日時": {
           result.date = td.nextElementSibling.textContent.trim().slice(0, 10);
           break;
@@ -118,6 +128,44 @@ export class RakutenPayWatcher {
           break;
         }
 
+        /**
+         * 楽天ペイ 注文受付（自動配信メール）
+         */
+
+        case "ご注文日：": {
+          result.date = td.parentNode.nextElementSibling.textContent.trim().slice(0, 10).replaceAll("-", "/");
+          break;
+        }
+
+        case "ご注文商品名：": {
+          result.merchant = td.parentNode.nextElementSibling.textContent.trim();
+          break;
+        }
+
+        case "ご注文金額：": {
+          const totalAmount = td.nextElementSibling.textContent.trim().slice(0, -1);
+          result.totalAmount = parseInt(totalAmount.replaceAll(",", ""), 10);
+          break;
+        }
+
+        case "ポイント/キャッシュ利用：": {
+          const amountPaid = td.nextElementSibling.textContent.trim().slice(1, -1);
+          result.cashUsed = parseInt(amountPaid.replaceAll(",", ""), 10);
+          break;
+        }
+
+        case "お支払い金額：": {
+          const amountPaid = td.nextElementSibling.textContent.trim().slice(0, -1);
+          result.cardUsed = parseInt(amountPaid.replaceAll(",", ""), 10);
+          break;
+        }
+
+        case "ご利用サイト：": {
+          const merchant = td.parentNode.nextElementSibling.textContent.trim();
+          result.merchant = merchant + (result.merchant !== "" ? ` ${result.merchant}` : result.merchant);
+          break;
+        }
+
         default: { /* do nothing */ }
       }
     });
@@ -145,7 +193,7 @@ export class RakutenPayWatcher {
 }
 
 /**
- * 「楽天ペイアプリご利用内容確認メール」から読み取れる取引内容。
+ * 「楽天ペイアプリご利用内容確認メール」と「楽天ペイ 注文受付（自動配信メール）」から読み取れる取引内容。
  */
 export interface RakutenPayTransaction {
   emailId: string;
