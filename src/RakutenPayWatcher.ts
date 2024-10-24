@@ -71,7 +71,7 @@ export class RakutenPayWatcher {
           }
         });
     } catch (e) {
-      console.log(` ❌ メールサーバーとの通信に失敗しました。`);
+      console.log(` ❌ ${new Date().toLocaleTimeString()} メールサーバーとの通信に失敗しました。`);
     }
   }
 
