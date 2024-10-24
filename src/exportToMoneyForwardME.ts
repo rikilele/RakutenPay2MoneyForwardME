@@ -77,6 +77,7 @@ export async function exportToMoneyForwardME(
     await page.select("#user_asset_act_sub_account_id_hash", source);
     content && await page.type("#js-cf-manual-payment-entry-content", content);
     await page.click("#js-cf-manual-payment-entry-submit-button");
+    await delay(2000);
     await browser.close();
 
   // When something goes wrong
@@ -109,3 +110,9 @@ export interface Payment {
   /** 内容（任意）*/
   content?: string;
 };
+
+function delay(time: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, time);
+  });
+}
