@@ -48,7 +48,6 @@ export async function exportToMoneyForwardME(
       const buttonText = await page.evaluate(el => el.innerText, button);
       if (buttonText.includes(email)) {
         await Promise.all([
-          //@ts-ignore
           button.click(),
           page.waitForNavigation(),
         ]);
