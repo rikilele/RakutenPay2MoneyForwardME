@@ -3,6 +3,7 @@
 import * as dotenv from "dotenv";
 import { RakutenPayWatcher } from "./RakutenPayWatcher";
 import { exportToMoneyForwardME } from "./exportToMoneyForwardME";
+import { delay } from "./utils";
 
 /**
  * 環境変数の読み込み & チェック。
@@ -86,17 +87,16 @@ watcher.subscribe((transaction) => {
         await exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment);
         console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
       } catch (_) {
-        setTimeout(async () => {
-          try {
-            exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
-            console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
-          } catch (e) {
-            const url = `https://app.mailslurp.com/emails/${emailId}`;
-            console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${url}\n`);
-            console.error(e);
-            console.log();
-          }
-        }, 3 * 60 * 1000); // Retry after 3 minutes
+        await delay(3 * 60 * 1_000); // Retry after 3 minutes
+        try {
+          exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
+          console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
+        } catch (e) {
+          const url = `https://app.mailslurp.com/emails/${emailId}`;
+          console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${url}\n`);
+          console.error(e);
+          console.log();
+        }
       }
     }
   });
