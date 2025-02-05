@@ -52,6 +52,7 @@ export class RakutenPayWatcher {
         .filter((email) => !email.read)
         .forEach(async (email) => {
           const { id } = email;
+          const url = `https://app.mailslurp.com/emails/${id}`;
 
           try {
             const { body } = await this.mailslurp.getEmail(id);
@@ -63,11 +64,11 @@ export class RakutenPayWatcher {
               ) {
                 this.subscribers.forEach((subscriber) => subscriber(transaction));
               } else {
-                console.log(` ❌ メール内容を正しく読み取れませんでした。 emailId: ${id}`);
+                console.log(` ❌ メール内容を正しく読み取れませんでした。 ${url}`);
               }
             }
           } catch (e) {
-            console.log(` ❌ メール取得に失敗しました。 emailId: ${id}`);
+            console.log(` ❌ メール取得に失敗しました。 ${url}`);
           }
         });
     } catch (e) {

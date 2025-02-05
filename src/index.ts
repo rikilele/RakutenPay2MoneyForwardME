@@ -93,7 +93,8 @@ watcher.subscribe((transaction) => {
                 console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
               })
               .catch((e) => {
-                console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 emailId: ${emailId}\n`);
+                const url = `https://app.mailslurp.com/emails/${emailId}`;
+                console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${url}\n`);
                 console.error(e);
                 console.log();
               });
