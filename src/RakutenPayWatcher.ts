@@ -42,6 +42,15 @@ export class RakutenPayWatcher {
     this.subscribers.push(fn);
   }
 
+  async deleteEmail(emailId: string) {
+    try {
+      this.mailslurp.deleteEmail(emailId);
+    } catch (e) {
+      const url = `https://app.mailslurp.com/emails/${emailId}`;
+      console.log(` ❌ メール削除に失敗しました。 ${url}`);
+    }
+  }
+
   /**
    * Pings the mail server.
    * Extracts the transaction information and notifies subscribers on new mail.

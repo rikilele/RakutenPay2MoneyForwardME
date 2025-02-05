@@ -2,7 +2,7 @@
 
 import * as dotenv from "dotenv";
 import { RakutenPayWatcher } from "./RakutenPayWatcher";
-import { exportToMoneyForwardME } from "./exportToMoneyForwardME";
+import { exportToMoneyForwardME, type Payment } from "./exportToMoneyForwardME";
 import { delay } from "./utils";
 
 /**
@@ -51,7 +51,7 @@ console.log("\x1b[1m\x1b[38;5;172m%s\x1b[0m", "\n   RakutenPay2MoneyForwardME 0.
  */
 
 const watcher = new RakutenPayWatcher(MAILSLURP_API_KEY, MAILSLURP_INBOX_ID);
-watcher.subscribe((transaction) => {
+watcher.subscribe(async (transaction) => {
 
   const {
     emailId,
@@ -81,23 +81,30 @@ watcher.subscribe((transaction) => {
     content: `${merchant} 楽天キャッシュ利用`,
   };
 
-  [pointPayment, cashPayment].forEach(async (payment) => {
-    if (payment.amount > 0) {
-      try {
-        await exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment);
-        console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
-      } catch (_) {
-        await delay(3 * 60 * 1_000); // Retry after 3 minutes
-        try {
-          exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
-          console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
-        } catch (e) {
-          const url = `https://app.mailslurp.com/emails/${emailId}`;
-          console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${url}\n`);
-          console.error(e);
-          console.log();
-        }
-      }
+  const promises = [pointPayment, cashPayment].map(async (payment) => {
+    if (payment.amount <= 0) {
+      return;
+    }
+
+    try {
+      await exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment);
+      console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
+
+    // Retry after 3 minutes
+    } catch {
+      await delay(3 * 60 * 1_000);
+      await exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment);
+      console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
     }
   });
+
+  try {
+    await Promise.all(promises);
+    watcher.deleteEmail(emailId);
+  } catch (e) {
+    const url = `https://app.mailslurp.com/emails/${emailId}`;
+    console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${url}\n`);
+    console.error(e);
+    console.log();
+  }
 });
