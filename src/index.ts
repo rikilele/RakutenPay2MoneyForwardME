@@ -80,26 +80,24 @@ watcher.subscribe((transaction) => {
     content: `${merchant} 楽天キャッシュ利用`,
   };
 
-  [pointPayment, cashPayment].forEach((payment) => {
+  [pointPayment, cashPayment].forEach(async (payment) => {
     if (payment.amount > 0) {
-      exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
-        .then(() => {
-          console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
-        })
-        .catch(() => {
-          setTimeout(() => {
+      try {
+        await exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment);
+        console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
+      } catch (_) {
+        setTimeout(async () => {
+          try {
             exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment)
-              .then(() => {
-                console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
-              })
-              .catch((e) => {
-                const url = `https://app.mailslurp.com/emails/${emailId}`;
-                console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${url}\n`);
-                console.error(e);
-                console.log();
-              });
-          }, 3 * 60 * 1000);
-        });
+            console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
+          } catch (e) {
+            const url = `https://app.mailslurp.com/emails/${emailId}`;
+            console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${url}\n`);
+            console.error(e);
+            console.log();
+          }
+        }, 3 * 60 * 1000); // Retry after 3 minutes
+      }
     }
   });
 });
