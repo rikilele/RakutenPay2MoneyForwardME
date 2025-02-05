@@ -2,7 +2,7 @@
 
 import * as dotenv from "dotenv";
 import { RakutenPayWatcher } from "./RakutenPayWatcher";
-import { exportToMoneyForwardME, type Payment } from "./exportToMoneyForwardME";
+import { exportToMoneyForwardME } from "./exportToMoneyForwardME";
 import { delay } from "./utils";
 
 /**
