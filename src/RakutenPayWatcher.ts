@@ -1,40 +1,52 @@
 // Copyright (c) 2023-2025 Riki Singh Khorana. All rights reserved. MIT License.
 
-import { MailSlurp } from "mailslurp-client";
 import { parse } from "node-html-parser";
 
 /**
- * MailSlurp に送られてくる「楽天ペイアプリご利用内容確認メール」と
+ * testmail.app に送られてくる「楽天ペイアプリご利用内容確認メール」と
  * 「楽天ペイ 注文受付（自動配信メール）」から取引内容を抽出し、
  * それらに対してアクションを起こす関数を管理・通知を飛ばすクラス。
  */
 export class RakutenPayWatcher {
 
-  /** MailSlurp API Controller */
-  private mailslurp: MailSlurp;
+  /** testmail.app API Key */
+  private apiKey: string;
 
-  /** The MailSlurp Inbox ID that receives Rakuten Pay emails */
-  private inboxId: string;
+  /** testmail.app Namespace (required) */
+  private namespace: string;
+
+  /** testmail.app Tag that receives Rakuten Pay emails (optional) */
+  private tag?: string;
+
+  /** unix timestamp of last ping */
+  private lastPing?: string;
 
   /** List of subscribers to Rakuten Pay transactions */
   private subscribers: RakutenPaySubscriber[];
 
   /**
-   * MailSlurp に送られてくる「楽天ペイアプリご利用内容確認メール」と
+   * testmail.app に送られてくる「楽天ペイアプリご利用内容確認メール」と
    * 「楽天ペイ 注文受付（自動配信メール）」から取引内容を抽出し、
    * それらに対してアクションを起こす関数を管理・通知を飛ばすオブジェクトを生成。
    *
-   * @param apiKey MailSlurp の API キー
-   * @param inboxId 受信トレイの ID
-   * @param pingInterval メールサーバーの ping 頻度。デフォルト５分
+   * @param apiKey testmail.app の API キー
+   * @param namespace testmail.app で割り当てられた namespace
+   * @param tag testmail.app に楽天ペイのメールを転送する際に使用した tag
+   * @param pingInterval メールサーバーへの ping 頻度。デフォルト５分
    */
-  constructor(apiKey: string, inboxId: string, pingInterval = 5 * 60 * 1000) {
-    this.mailslurp = new MailSlurp({ apiKey });
-    this.inboxId = inboxId;
+  constructor(
+    apiKey: string,
+    namespace: string,
+    tag?: string,
+    pingInterval = 5 * 60 * 1000
+  ) {
+    this.apiKey = apiKey;
+    this.namespace = namespace;
+    this.tag = tag;
     this.subscribers = [];
 
     // set up ping
-    this.ping();
+    this.lastPing = Date.now().toString();
     setInterval(() => this.ping(), pingInterval);
   }
 
@@ -42,52 +54,59 @@ export class RakutenPayWatcher {
     this.subscribers.push(fn);
   }
 
-  async deleteEmail(emailId: string) {
-    try {
-      this.mailslurp.deleteEmail(emailId);
-    } catch (e) {
-      const url = `https://app.mailslurp.com/emails/${emailId}`;
-      console.log(` ❌ メール削除に失敗しました。 ${url}`);
-    }
-  }
-
   /**
    * Pings the mail server.
    * Extracts the transaction information and notifies subscribers on new mail.
    */
   private async ping() {
+    const now = new Date();
+    const timestamp = now.getTime().toString();
+    const timeString = now.toLocaleTimeString();
     try {
-      (await this.mailslurp.getEmails(this.inboxId))
-        .filter((email) => !email.read)
-        .forEach(async (email) => {
-          const { id } = email;
-          const url = `https://app.mailslurp.com/emails/${id}`;
+      const url = new URL("https://api.testmail.app/api/json");
+      url.searchParams.set("apikey", this.apiKey);
+      url.searchParams.set("namespace", this.namespace);
+      url.searchParams.set("limit", "100");
+      this.lastPing && url.searchParams.set("timestamp_from", this.lastPing);
+      this.tag && url.searchParams.set("tag", this.tag);
+      const res = await fetch(url.toString());
+      if (!res.ok) {
+        console.log(` ❌ ${timeString} メール取得に失敗しました。${res.status} - ${res.statusText}`);
+        return;
+      }
 
-          try {
-            const { body } = await this.mailslurp.getEmail(id);
-            if (body) {
-              const transaction = this.parseEmailBody(id, body);
-              if (
-                this.isValidTransaction(transaction)
-                && (transaction.pointsUsed > 0 || transaction.cashUsed > 0)
-              ) {
-                this.subscribers.forEach((subscriber) => subscriber(transaction));
-              } else {
-                console.log(` ❌ メール内容を正しく読み取れませんでした。 ${url}`);
-              }
-            }
-          } catch (e) {
-            console.log(` ❌ メール取得に失敗しました。 ${url}`);
+      const response: ApiResponse = await res.json();
+      if (response.result === "fail") {
+        console.log(` ❌ ${timeString} メール取得に失敗しました。${res.status} - ${response.message}`);
+        return;
+      }
+
+      // ping was successful
+      this.lastPing = timestamp;
+      const { emails } = response;
+      for (const { id, html, downloadUrl } of emails) {
+        if (html) {
+          const transaction = this.parseEmailBody(html);
+          if (
+            this.isValidTransaction(transaction)
+            && (transaction.pointsUsed > 0 || transaction.cashUsed > 0)
+          ) {
+            this.subscribers.forEach((subscriber) => subscriber(id, downloadUrl, transaction));
+          } else {
+            console.log(` ❌ ${timeString} メール内容を正しく読み取れませんでした。${downloadUrl}`);
           }
-        });
-    } catch (e) {
-      console.log(` ❌ ${new Date().toLocaleTimeString()} メールサーバーとの通信に失敗しました。`);
+        }
+      }
+    } catch {
+      console.log(` ❌ ${timeString} サーバーとの通信に失敗しました。`);
     }
   }
 
-  private parseEmailBody(id: string, body: string): RakutenPayTransaction {
+  /**
+   * Given raw HTML from a Rakuten Pay email, parse out the transaction details.
+   */
+  private parseEmailBody(body: string): RakutenPayTransaction {
     const result: RakutenPayTransaction = {
-      emailId: id,
       date: "",
       merchant: "",
       totalAmount: 0,
@@ -202,12 +221,28 @@ export class RakutenPayWatcher {
   }
 }
 
+interface EmailObject {
+  id: string;
+  html: string;
+  downloadUrl: string;
+};
+
+/**
+ * https://testmail.app/docs/#json-api-guide
+ */
+interface ApiResponse {
+  result: "success" | "fail";
+  message: string | null;
+  count: number;
+  limit: number;
+  offset: number;
+  emails: EmailObject[];
+};
+
 /**
  * 「楽天ペイアプリご利用内容確認メール」と「楽天ペイ 注文受付（自動配信メール）」から読み取れる取引内容。
  */
 export interface RakutenPayTransaction {
-  emailId: string;
-
   /** ご利用日時： YYYY/MM/DD */
   date: string;
 
@@ -230,4 +265,4 @@ export interface RakutenPayTransaction {
 /**
  * 新規の楽天ペイ取引内容に対してアクションを実行する関数。
  */
-export type RakutenPaySubscriber = (transaction: RakutenPayTransaction) => void;
+export type RakutenPaySubscriber = (emailId: string, emailUrl: string, transaction: RakutenPayTransaction) => void;

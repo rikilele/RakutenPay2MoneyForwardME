@@ -12,19 +12,20 @@ import { delay } from "./utils";
 dotenv.config();
 
 const {
-  MAILSLURP_API_KEY,
-  MAILSLURP_INBOX_ID,
+  TESTMAIL_API_KEY,
+  TESTMAIL_NAMESPACE,
+  TESTMAIL_TAG,
   MONEY_FORWARD_EMAIL,
   MONEY_FORWARD_PW,
 } = process.env;
 
-if (!MAILSLURP_API_KEY) {
-  console.log("MAILSLURP_API_KEY env variable missing");
+if (!TESTMAIL_API_KEY) {
+  console.log("TESTMAIL_API_KEY env variable missing");
   process.exit(1);
 }
 
-if (!MAILSLURP_INBOX_ID) {
-  console.log("MAILSLURP_INBOX_ID env variable missing");
+if (!TESTMAIL_NAMESPACE) {
+  console.log("TESTMAIL_NAMESPACE env variable missing");
   process.exit(1);
 }
 
@@ -43,18 +44,17 @@ if (!MONEY_FORWARD_PW) {
  */
 
 process.stdout.write("\x1Bc");
-console.log("\x1b[1m\x1b[38;5;172m%s\x1b[0m", "\n   RakutenPay2MoneyForwardME 0.1.0\n");
+console.log("\x1b[1m\x1b[38;5;172m%s\x1b[0m", "\n   RakutenPay2MoneyForwardME 0.2.0\n");
 
 /**
  * 「楽天ペイアプリご利用内容確認メール」と「楽天ペイ 注文受付（自動配信メール）」をウォッチ。
  * 取引内容を抽出し、マネーフォワード ME に書き出す。
  */
 
-const watcher = new RakutenPayWatcher(MAILSLURP_API_KEY, MAILSLURP_INBOX_ID);
-watcher.subscribe(async (transaction) => {
+const watcher = new RakutenPayWatcher(TESTMAIL_API_KEY, TESTMAIL_NAMESPACE, TESTMAIL_TAG);
+watcher.subscribe(async (id, emailUrl, transaction) => {
 
   const {
-    emailId,
     date,
     merchant,
     pointsUsed,
@@ -88,22 +88,20 @@ watcher.subscribe(async (transaction) => {
 
     try {
       await exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment);
-      console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
+      console.log(` ✅ ${id} ${date} ${merchant} ${payment.amount}`);
 
     // Retry after 3 minutes
     } catch {
       await delay(3 * 60 * 1_000);
       await exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment);
-      console.log(` ✅ ${emailId} ${date} ${merchant} ${payment.amount}`);
+      console.log(` ✅ ${id} ${date} ${merchant} ${payment.amount}`);
     }
   });
 
   try {
     await Promise.all(promises);
-    watcher.deleteEmail(emailId);
   } catch (e) {
-    const url = `https://app.mailslurp.com/emails/${emailId}`;
-    console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${url}\n`);
+    console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${emailUrl}\n`);
     console.error(e);
     console.log();
   }

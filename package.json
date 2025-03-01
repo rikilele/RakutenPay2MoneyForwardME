@@ -1,11 +1,10 @@
 {
   "name": "rp2mfm",
   "description": "Automate Rakuten Pay email to Money Forward ME input",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "src/index.ts",
   "dependencies": {
     "dotenv": "^16.0.3",
-    "mailslurp-client": "^15.20.2",
     "node-html-parser": "^6.1.4",
     "puppeteer": "^23.6.0"
   },
