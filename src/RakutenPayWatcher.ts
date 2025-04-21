@@ -1,6 +1,7 @@
 // Copyright (c) 2023-2025 Riki Singh Khorana. All rights reserved. MIT License.
 
 import { parse } from "node-html-parser";
+import type { TestmailClient } from "./TestmailClient";
 
 /**
  * testmail.app に送られてくる「楽天ペイアプリご利用内容確認メール」と
@@ -9,17 +10,11 @@ import { parse } from "node-html-parser";
  */
 export class RakutenPayWatcher {
 
-  /** testmail.app API Key */
-  private apiKey: string;
+  /** testmail.app client */
+  private testmailClient: TestmailClient;
 
-  /** testmail.app Namespace (required) */
-  private namespace: string;
-
-  /** testmail.app Tag that receives Rakuten Pay emails (optional) */
-  private tag?: string;
-
-  /** unix timestamp of last ping */
-  private lastPing?: string;
+  /** Date of last ping */
+  private lastPing?: Date;
 
   /** List of subscribers to Rakuten Pay transactions */
   private subscribers: RakutenPaySubscriber[];
@@ -29,24 +24,15 @@ export class RakutenPayWatcher {
    * 「楽天ペイ 注文受付（自動配信メール）」から取引内容を抽出し、
    * それらに対してアクションを起こす関数を管理・通知を飛ばすオブジェクトを生成。
    *
-   * @param apiKey testmail.app の API キー
-   * @param namespace testmail.app で割り当てられた namespace
-   * @param tag testmail.app に楽天ペイのメールを転送する際に使用した tag
+   * @param testmailClient testmail.app client オブジェクト
    * @param pingInterval メールサーバーへの ping 頻度。デフォルト５分
    */
   constructor(
-    apiKey: string,
-    namespace: string,
-    tag?: string,
+    testmailClient: TestmailClient,
     pingInterval = 5 * 60 * 1000
   ) {
-    this.apiKey = apiKey;
-    this.namespace = namespace;
-    this.tag = tag;
+    this.testmailClient = testmailClient;
     this.subscribers = [];
-
-    // set up ping
-    this.lastPing = Date.now().toString();
     setInterval(() => this.ping(), pingInterval);
   }
 
@@ -60,43 +46,32 @@ export class RakutenPayWatcher {
    */
   private async ping() {
     const now = new Date();
-    const timestamp = now.getTime().toString();
     const timeString = now.toLocaleTimeString();
     try {
-      const url = new URL("https://api.testmail.app/api/json");
-      url.searchParams.set("apikey", this.apiKey);
-      url.searchParams.set("namespace", this.namespace);
-      url.searchParams.set("limit", "100");
-      this.lastPing && url.searchParams.set("timestamp_from", this.lastPing);
-      this.tag && url.searchParams.set("tag", this.tag);
-      const res = await fetch(url.toString());
-      if (!res.ok) {
-        console.log(` ❌ ${timeString} メール取得に失敗しました。${res.status} - ${res.statusText}`);
+      const emails = await this.testmailClient.get(this.lastPing);
+      if (!emails) {
         return;
       }
 
-      const response: ApiResponse = await res.json();
-      if (response.result === "fail") {
-        console.log(` ❌ ${timeString} メール取得に失敗しました。${res.status} - ${response.message}`);
-        return;
-      }
+      this.lastPing = now;
+      const transactions: RakutenPayTransaction[] = [];
+      for (const { html, downloadUrl } of emails) {
+        if (!html) {
+          continue;
+        }
 
-      // ping was successful
-      this.lastPing = timestamp;
-      const { emails } = response;
-      for (const { id, html, downloadUrl } of emails) {
-        if (html) {
-          const transaction = this.parseEmailBody(html);
-          if (
-            this.isValidTransaction(transaction)
-            && (transaction.pointsUsed > 0 || transaction.cashUsed > 0)
-          ) {
-            this.subscribers.forEach((subscriber) => subscriber(id, downloadUrl, transaction));
-          } else {
-            console.log(` ❌ ${timeString} メール内容を正しく読み取れませんでした。${downloadUrl}`);
-          }
+        const transaction = this.parseEmailBody(html);
+        if (
+          this.isValidTransaction(transaction)
+          && (transaction.pointsUsed > 0 || transaction.cashUsed > 0)
+        ) {
+          transactions.push(transaction);
+        } else {
+          console.log(` ❌ ${timeString} メール内容を正しく読み取れませんでした。${downloadUrl}`);
         }
       }
+
+      this.subscribers.forEach((subscriber) => subscriber(transactions));
     } catch {
       console.log(` ❌ ${timeString} サーバーとの通信に失敗しました。`);
     }
@@ -221,24 +196,6 @@ export class RakutenPayWatcher {
   }
 }
 
-interface EmailObject {
-  id: string;
-  html: string;
-  downloadUrl: string;
-};
-
-/**
- * https://testmail.app/docs/#json-api-guide
- */
-interface ApiResponse {
-  result: "success" | "fail";
-  message: string | null;
-  count: number;
-  limit: number;
-  offset: number;
-  emails: EmailObject[];
-};
-
 /**
  * 「楽天ペイアプリご利用内容確認メール」と「楽天ペイ 注文受付（自動配信メール）」から読み取れる取引内容。
  */
@@ -265,4 +222,4 @@ export interface RakutenPayTransaction {
 /**
  * 新規の楽天ペイ取引内容に対してアクションを実行する関数。
  */
-export type RakutenPaySubscriber = (emailId: string, emailUrl: string, transaction: RakutenPayTransaction) => void;
+export type RakutenPaySubscriber = (transactions: RakutenPayTransaction[]) => void;

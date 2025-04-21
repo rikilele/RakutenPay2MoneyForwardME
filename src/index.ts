@@ -2,8 +2,8 @@
 
 import * as dotenv from "dotenv";
 import { RakutenPayWatcher } from "./RakutenPayWatcher";
-import { exportToMoneyForwardME } from "./exportToMoneyForwardME";
-import { delay } from "./utils";
+import { exportToMoneyForwardME, Payment } from "./exportToMoneyForwardME";
+import { TestmailClient } from "./TestmailClient";
 
 /**
  * 環境変数の読み込み & チェック。
@@ -14,7 +14,6 @@ dotenv.config();
 const {
   TESTMAIL_API_KEY,
   TESTMAIL_NAMESPACE,
-  TESTMAIL_TAG,
   MONEY_FORWARD_EMAIL,
   MONEY_FORWARD_PW,
 } = process.env;
@@ -51,58 +50,52 @@ console.log("\x1b[1m\x1b[38;5;172m%s\x1b[0m", "\n   RakutenPay2MoneyForwardME 0.
  * 取引内容を抽出し、マネーフォワード ME に書き出す。
  */
 
-const watcher = new RakutenPayWatcher(TESTMAIL_API_KEY, TESTMAIL_NAMESPACE, TESTMAIL_TAG);
-watcher.subscribe(async (id, emailUrl, transaction) => {
+const rpTestmailClient = new TestmailClient(TESTMAIL_API_KEY, TESTMAIL_NAMESPACE, "rp");
+const mfTestmailClient = new TestmailClient(TESTMAIL_API_KEY, TESTMAIL_NAMESPACE, "mf");
+const watcher = new RakutenPayWatcher(rpTestmailClient);
+watcher.subscribe((transactions) => {
+  const payments: Payment[] = [];
+  transactions.forEach((transaction) => {
+    const {
+      date,
+      merchant,
+      pointsUsed,
+      cashUsed,
+    } = transaction;
 
-  const {
-    date,
-    merchant,
-    pointsUsed,
-    cashUsed,
-  } = transaction;
+    // TODO: Dynamically edit category
 
-  // TODO: Dynamically edit category
-
-  const pointPayment = {
-    largeCategory: "0",
-    middleCategory: "0",
-    date,
-    amount: pointsUsed,
-    source: "0",
-    content: `${merchant} 楽天ポイント利用`,
-  };
-
-  const cashPayment = {
-    largeCategory: "0",
-    middleCategory: "0",
-    date,
-    amount: cashUsed,
-    source: "0",
-    content: `${merchant} 楽天キャッシュ利用`,
-  };
-
-  const promises = [pointPayment, cashPayment].map(async (payment) => {
-    if (payment.amount <= 0) {
-      return;
+    if (pointsUsed > 0) {
+      console.log(` ⏬ ${date} ${merchant} 楽天ポイント利用 ${pointsUsed}`);
+      payments.push({
+        largeCategory: "0",
+        middleCategory: "0",
+        date,
+        amount: pointsUsed,
+        source: "0",
+        content: `${merchant} 楽天ポイント利用`,
+      });
     }
 
-    try {
-      await exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment);
-      console.log(` ✅ ${id} ${date} ${merchant} ${payment.amount}`);
-
-    // Retry after 3 minutes
-    } catch {
-      await delay(3 * 60 * 1_000);
-      await exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, payment);
-      console.log(` ✅ ${id} ${date} ${merchant} ${payment.amount}`);
+    if (cashUsed > 0) {
+      console.log(` ⏬ ${date} ${merchant} 楽天キャッシュ利用 ${cashUsed}`);
+      payments.push({
+        largeCategory: "0",
+        middleCategory: "0",
+        date,
+        amount: cashUsed,
+        source: "0",
+        content: `${merchant} 楽天キャッシュ利用`,
+      });
     }
   });
 
-  try {
-    await Promise.all(promises);
-  } catch (e) {
-    console.log(`\n ❌ マネーフォワードへの書き出しに失敗しました。 ${emailUrl}\n`);
-    console.error(e);
-    console.log();
+  if (payments.length > 0) {
+    exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, mfTestmailClient, payments)
+      .catch((e) => {
+        console.error("\n ❌ マネーフォワードへの書き出しに失敗しました。");
+        console.error(e);
+        console.log();
+      });
   }
 });

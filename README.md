@@ -15,10 +15,13 @@
 
 1. [testmail.app アカウントを作成](https://testmail.app/signup)
 1. 自動で割り当てられた `namespace` をメモ
-1. （任意）お好みで `tag` を決定
-1. 「楽天ペイアプリご利用内容確認メール」と「楽天ペイ 注文受付（自動配信メール）」が自動で `{namespace}.{tag}@inbox.testmail.app` に転送されるよう設定
-    - [Gmail の場合](https://support.google.com/mail/answer/10957)
-    - [Outlook の場合](https://support.microsoft.com/en-us/office/turn-on-automatic-forwarding-in-outlook-7f2670a1-7fff-4475-8a3c-5822d63b0c8e)
+1. 「Money Forward ID Additional Authentication via Email」が自動で `{namespace}.mf@inbox.testmail.app` に転送されるよう設定
+1. 「楽天ペイアプリご利用内容確認メール」が自動で `{namespace}.rp@inbox.testmail.app` に転送されるよう設定
+1. 「楽天ペイ 注文受付（自動配信メール）」が自動で `{namespace}.rp@inbox.testmail.app` に転送されるよう設定
+
+    > メールの自動転送の設定方法
+    > - [Gmail の場合](https://support.google.com/mail/answer/10957)
+    > - [Outlook の場合](https://support.microsoft.com/en-us/office/turn-on-automatic-forwarding-in-outlook-7f2670a1-7fff-4475-8a3c-5822d63b0c8e)
 
 ### 2. ⬇️ `npm install`
 
@@ -38,7 +41,6 @@ $ touch .env
 ```js
 TESTMAIL_API_KEY="testmail.app の APIキー"
 TESTMAIL_NAMESPACE="testmail.app の namespace"
-TESTMAIL_TAG="testmail.app の tag"
 MONEY_FORWARD_EMAIL="マネーフォワード ID のメールアドレス"
 MONEY_FORWARD_PW="マネーフォワード ID のパスワード"
 ```
