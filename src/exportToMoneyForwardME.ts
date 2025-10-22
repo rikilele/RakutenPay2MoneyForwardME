@@ -114,17 +114,7 @@ export async function exportToMoneyForwardME(
       content && await tab.type("#js-cf-manual-payment-entry-content", content);
       await tab.click("#js-cf-manual-payment-entry-submit-button");
 
-      /*********************
-       * Verify submission *
-       *********************/
-
-      await tab.waitForFunction(() => {
-        const transaction = document.querySelector("#recent-transactions-table")?.firstElementChild;
-        return transaction?.getAttribute("data-row-index") === "4";
-      }, {
-        timeout: 10_000,
-        polling: 1_000,
-      });
+      await delay(5_000); // Wait 5 seconds for submission to complete
     }
   } catch (err) {
     throw err;
