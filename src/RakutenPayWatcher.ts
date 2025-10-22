@@ -46,6 +46,7 @@ export class RakutenPayWatcher {
    */
   private async ping() {
     const now = new Date();
+    const dateString = now.toISOString().split("T")[0].replaceAll("-", "/");
     const timeString = now.toLocaleTimeString();
     try {
       const emails = await this.testmailClient.get(this.lastPing);
@@ -67,13 +68,13 @@ export class RakutenPayWatcher {
         ) {
           transactions.push(transaction);
         } else {
-          console.log(` ❌ ${timeString} メール内容を正しく読み取れませんでした。${downloadUrl}`);
+          console.log(` ❌ ${dateString} ${timeString} メール内容を正しく読み取れませんでした。${downloadUrl}`);
         }
       }
 
       this.subscribers.forEach((subscriber) => subscriber(transactions));
     } catch {
-      console.log(` ❌ ${timeString} サーバーとの通信に失敗しました。`);
+      console.log(` ❌ ${dateString} ${timeString} サーバーとの通信に失敗しました。`);
     }
   }
 

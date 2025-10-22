@@ -12,7 +12,9 @@ export class TestmailClient {
     }
 
     async get(from?: Date) {
-      const now = new Date().toLocaleTimeString();
+      const now = new Date();
+      const dateString = now.toISOString().split("T")[0].replaceAll("-", "/");
+      const timeString = now.toLocaleTimeString();
       const url = new URL("https://api.testmail.app/api/json");
       url.searchParams.set("apikey", this.apiKey);
       url.searchParams.set("namespace", this.namespace);
@@ -22,13 +24,13 @@ export class TestmailClient {
       timestampFrom && url.searchParams.set("timestamp_from", timestampFrom);
       const res = await fetch(url.toString());
       if (!res.ok) {
-        console.log(` ❌ ${now} メール取得に失敗しました。${res.status} - ${res.statusText}`);
+        console.log(` ❌ ${dateString} ${timeString} メール取得に失敗しました。${res.status} - ${res.statusText}`);
         return;
       }
 
       const response: ApiResponse = await res.json();
       if (response.result === "fail") {
-        console.log(` ❌ ${now} メール取得に失敗しました。${res.status} - ${response.message}`);
+        console.log(` ❌ ${dateString} ${timeString} メール取得に失敗しました。${res.status} - ${response.message}`);
         return;
       }
 

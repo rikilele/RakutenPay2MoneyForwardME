@@ -91,9 +91,12 @@ watcher.subscribe((transactions) => {
   });
 
   if (payments.length > 0) {
+    const now = new Date();
+    const dateString = now.toISOString().split("T")[0].replaceAll("-", "/");
+    const timeString = now.toLocaleTimeString();
     exportToMoneyForwardME(MONEY_FORWARD_EMAIL, MONEY_FORWARD_PW, mfTestmailClient, payments)
       .catch((e) => {
-        console.error("\n ❌ マネーフォワードへの書き出しに失敗しました。");
+        console.error(`\n ${dateString} ${timeString} ❌ マネーフォワードへの書き出しに失敗しました。`);
         console.error(e);
         console.log();
       });
